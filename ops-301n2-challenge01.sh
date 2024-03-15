@@ -14,7 +14,7 @@ for file in /Users/hugoferraz/Desktop/Challenge01/*.sh; do
 
     cp "$file" "$file.$datetime"
 
-    echo "$datetime" >> "$file.$datatime"
+    echo "$datetime" >> "$file.$datetime"
 
 done
 
