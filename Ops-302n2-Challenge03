@@ -7,7 +7,7 @@ read dir_path
 
 # Requests the number of permissions
 
-echo "Enter the permissions number (e.g.777:"
+echo "Enter the permissions number (e.g.777"
 read permissions
 
 #Checks if the directory exists
