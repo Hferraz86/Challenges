@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Path of the directory
+
+dir_path='/home/hferraz/Desktop/Challenge 03'
+
+# ls -la = -rw-rw-r
+
+# Requests the number of permissions
+
+read -p 777 permissions
+
+#Checks if the directory exists
+
+if [ ! -d "$dir_path" ]; then
+  echo "Error: Directory  '$dir_path' not fund"
+  exit 1
+fi
+
+# Go to the specified directory
+
+cd "$dir_path"
+
+# Change permissions for all files
+
+chmod -R "$permissions" ./*
+
+Display the directory contents with the new permissions
+
+ls -l
+
+echo "Permissions changed successfully!"
