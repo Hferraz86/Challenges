@@ -1,0 +1,15 @@
+# Script to configure the settings for benchmarks 1.1.5 (L1) and 18.4.3 (L1)
+
+# Configure policy 1.1.5 (L1) - Password must meet complexity requirements
+$ComplexityPolicyPath = "HKLM:\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters"
+$ComplexityPolicyName = "requirestrongkey"
+$ComplexityPolicyValue = 1
+Set-ItemProperty -Path $ComplexityPolicyPath -Name $ComplexityPolicyName -Value $ComplexityPolicyValue
+
+# Configure policy 18.4.3 (L1) - Audit PNP Activity
+$AuditPNPPath = "HKLM:\SYSTEM\CurrentControlSet\Services\eventlog\Security"
+$AuditPNPName = "Object Access"
+$AuditPNPValue = @{
+    AuditPNPActivity = 1
+}
+Set-ItemProperty -Path $AuditPNPPath -Name $AuditPNPName -Value $AuditPNPValue
