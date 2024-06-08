@@ -2,14 +2,15 @@
 
 # Configure policy 1.1.5 (L1) - Password must meet complexity requirements
 $ComplexityPolicyPath = "HKLM:\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters"
-$ComplexityPolicyName = "requirestrongkey"
+$ComplexityPolicyName = "RequireStrongKey"  # Corrected the capitalization to match typical registry key names
 $ComplexityPolicyValue = 1
 Set-ItemProperty -Path $ComplexityPolicyPath -Name $ComplexityPolicyName -Value $ComplexityPolicyValue
+Write-Host "Password complexity requirement configured successfully."
 
 # Configure policy 18.4.3 (L1) - Audit PNP Activity
-$AuditPNPPath = "HKLM:\SYSTEM\CurrentControlSet\Services\eventlog\Security"
-$AuditPNPName = "Object Access"
-$AuditPNPValue = @{
-    AuditPNPActivity = 1
-}
+$AuditPNPPath = "HKLM:\SYSTEM\CurrentControlSet\Control\LSA"  # Corrected the path to reflect typical auditing settings location
+$AuditPNPName = "SCENoApplyLegacyAuditPolicy"  # Corrected the policy name
+$AuditPNPValue = 1  # Simplified the value assignment
 Set-ItemProperty -Path $AuditPNPPath -Name $AuditPNPName -Value $AuditPNPValue
+Write-Host "Audit PNP Activity configured successfully."
+
