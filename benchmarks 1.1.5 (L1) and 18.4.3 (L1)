@@ -1,16 +1,41 @@
-# Script to configure the settings for benchmarks 1.1.5 (L1) and 18.4.3 (L1)
-
-# Configure policy 1.1.5 (L1) - Password must meet complexity requirements
-$ComplexityPolicyPath = "HKLM:\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters"
-$ComplexityPolicyName = "RequireStrongKey"  # Corrected the capitalization to match typical registry key names
-$ComplexityPolicyValue = 1
-Set-ItemProperty -Path $ComplexityPolicyPath -Name $ComplexityPolicyName -Value $ComplexityPolicyValue
-Write-Host "Password complexity requirement configured successfully."
-
-# Configure policy 18.4.3 (L1) - Audit PNP Activity
-$AuditPNPPath = "HKLM:\SYSTEM\CurrentControlSet\Control\LSA"  # Corrected the path to reflect typical auditing settings location
-$AuditPNPName = "SCENoApplyLegacyAuditPolicy"  # Corrected the policy name
-$AuditPNPValue = 1  # Simplified the value assignment
-Set-ItemProperty -Path $AuditPNPPath -Name $AuditPNPName -Value $AuditPNPValue
-Write-Host "Audit PNP Activity configured successfully."
+# Define Function to Set Registry Key
+function Set-RegistryKey {
+    param (
+        [string]$Path,
+        [string]$Name,
+        [string]$Value
+    )
+​
+    try {
+        if (-not (Test-Path $Path)) {
+            New-Item -Path $Path -Force
+        }
+        Set-ItemProperty -Path $Path -Name $Name -Value $Value -ErrorAction Stop
+        Write-Host "Registry key updated successfully: $Path\$Name"
+    } catch {
+        Write-Host "Error updating registry key: $_"
+    }
+}
+​
+# Policy 1.1.5 (L1)
+$RegistryPath_1_1_5 = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Installer"
+$RegistryName_1_1_5 = "SecureRepairPolicy"
+$RegistryValue_1_1_5 = 2  # Set the appropriate value according to the benchmark
+​
+Set-RegistryKey -Path $RegistryPath_1_1_5 -Name $RegistryName_1_1_5 -Value $RegistryValue_1_1_5
+​
+# Policy 18.4.3 (L1)
+$RegistryPath_18_4_3 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Hashes\SHA"
+$RegistryName_18_4_3 = "Enabled"
+$RegistryValue_18_4_3 = 0  # Set the appropriate value according to the benchmark
+​
+Set-RegistryKey -Path $RegistryPath_18_4_3 -Name $RegistryName_18_4_3 -Value $RegistryValue_18_4_3
+​
+# Detect if its enabled or disabled
+Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol
+​
+# Command to Disable
+#Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol
+# Command to Enable
+#Enable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol
 
