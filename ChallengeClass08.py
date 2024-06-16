@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
 # Step 1: Assign a list of ten string elements representing Benfica players to a variable
 benfica_players = [
