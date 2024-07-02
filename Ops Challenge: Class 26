@@ -2,6 +2,15 @@
 
 #!/usr/bin/env python3
 
+#This script performs a network scan and logs events to a log file. It does the following:
+
+    #Prompts the user to enter a network address in CIDR notation.
+    #Generates a list of IP addresses in the specified network.
+    #Pings each IP address to check if it is reachable.
+    #Scans a range of ports (20-1025) on the reachable IP addresses.
+    #Logs all events, including reachable IPs, open ports, filtered or silently dropped ports, and unreachable IPs.
+    #All logs are stored in a file called network_scan.log.
+
 import subprocess
 import ipaddress
 import logging
