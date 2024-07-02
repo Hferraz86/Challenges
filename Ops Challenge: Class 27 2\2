@@ -1,0 +1,98 @@
+#!/Library/Frameworks/Python.framework/Versions/3.12/bin/python3
+
+#!/usr/bin/env python3
+
+#This script performs a network scan and logs events to a log file with log rotation based on time. It does the following:
+
+    #Prompts the user to enter a network address in CIDR notation.
+    #Generates a list of IP addresses in the specified network.
+    #Pings each IP address to check if it is reachable.
+    #Scans a range of ports (20-1025) on the reachable IP addresses.
+    #Logs all events, including reachable IPs, open ports, filtered or silently dropped ports, and unreachable IPs.
+    #At midnight, a new log file (network_scan_time.log) is created, and the previous log file is archived. Up to 7 backup log files are kept.
+
+import subprocess
+import ipaddress
+import logging
+from logging.handlers import TimedRotatingFileHandler
+from scapy.all import *
+
+# Logging configuration with time-based rotation
+log_handler = TimedRotatingFileHandler('network_scan_time.log', when='midnight', interval=1, backupCount=7)
+log_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(message)s')
+log_handler.setFormatter(formatter)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(log_handler)
+
+def ping_host(ip_address):
+    """
+    Ping a given IP address and return True if it responds, False otherwise.
+    """
+    try:
+        logging.info(f"Pinging {ip_address}")
+        result = subprocess.run(['ping', '-c', '1', '-W', '2', ip_address], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5)
+        if result.returncode == 0:
+            logging.info(f"{ip_address} is reachable.")
+            return True
+        else:
+            logging.info(f"{ip_address} is not reachable.")
+            return False
+    except subprocess.TimeoutExpired:
+        logging.error(f"Timeout expired while pinging {ip_address}")
+        return False
+    except Exception as e:
+        logging.error(f"Error pinging {ip_address}: {str(e)}")
+        return False
+
+def scan_ports(ip_address, port_range):
+    """
+    Scan ports on a given IP address.
+    """
+    open_ports = []
+    for port in port_range:
+        try:
+            syn_packet = IP(dst=ip_address) / TCP(dport=port, flags='S')
+            response = sr1(syn_packet, timeout=1, verbose=0)
+            if response:
+                if response.haslayer(TCP):
+                    if response[TCP].flags == 0x12:  # SYN-ACK
+                        open_ports.append(port)
+                        rst_packet = IP(dst=ip_address) / TCP(dport=port, flags='R')
+                        send(rst_packet, verbose=0)
+                    elif response[TCP].flags == 0x14:  # RST-ACK
+                        pass  # Port is closed
+                elif response.haslayer(ICMP):
+                    if int(response[ICMP].type) == 3 and int(response[ICMP].code) in [1, 2, 3, 9, 10, 13]:
+                        logging.info(f"Port {port} is filtered on {ip_address}.")
+            else:
+                logging.info(f"Port {port} is filtered or silently dropped on {ip_address}.")
+        except Exception as e:
+            logging.error(f"Error scanning port {port} on {ip_address}: {str(e)}")
+
+    return open_ports
+
+def main():
+    target_cidr = input("Enter the target network address in CIDR notation (e.g., 192.168.1.0/24): ").strip()
+    try:
+        network = ipaddress.ip_network(target_cidr)
+    except ValueError as e:
+        logging.error(f"Invalid network address: {e}")
+        return
+
+    port_range = range(20, 1025)
+
+    for ip in network.hosts():
+        ip_address = str(ip)
+        if ping_host(ip_address):
+            open_ports = scan_ports(ip_address, port_range)
+            if open_ports:
+                logging.info(f"Open ports on {ip_address}: {open_ports}")
+            else:
+                logging.info(f"No open ports found on {ip_address}.")
+        else:
+            logging.info(f"{ip_address} is down or unresponsive. Skipping port scan.")
+
+if __name__ == "__main__":
+    main()
